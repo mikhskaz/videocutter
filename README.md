@@ -98,12 +98,13 @@ The tool outputs a CSV file with the following columns (no header row):
 | Video Path | Absolute path to the source video |
 | Label | `1` = Pass, `0` = Fail, `2` = Uncertain |
 | Output Path | Path to extracted failure clip (empty for Pass/Uncertain) |
+| Note | Optional note for uncertain videos |
 
 Example:
 ```csv
-C:/Videos/video1.mp4,1,
-C:/Videos/video2.mp4,0,C:/Videos/_failures/video2_fail_5s-12s.mp4
-C:/Videos/video3.mp4,2,
+C:/Videos/video1.mp4,1,,
+C:/Videos/video2.mp4,0,C:/Videos/_failures/video2_fail_5s-12s.mp4,
+C:/Videos/video3.mp4,2,,needs review - lighting issue
 ```
 
 ## Project Structure

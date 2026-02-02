@@ -51,12 +51,12 @@ class CSVManager:
 
         return labeled
 
-    def get_all_entries(self) -> List[Tuple[str, int, Optional[str]]]:
+    def get_all_entries(self) -> List[Tuple[str, int, Optional[str], Optional[str]]]:
         """
         Read all entries from the CSV.
 
         Returns:
-            List of tuples (video_path, label, output_path).
+            List of tuples (video_path, label, output_path, note).
         """
         entries = []
 
@@ -71,7 +71,8 @@ class CSVManager:
                         video_path = row[0]
                         label = int(row[1])
                         output_path = row[2] if len(row) > 2 and row[2] else None
-                        entries.append((video_path, label, output_path))
+                        note = row[3] if len(row) > 3 and row[3] else None
+                        entries.append((video_path, label, output_path, note))
         except Exception:
             pass
 
@@ -84,7 +85,7 @@ class CSVManager:
         Args:
             video_path: Absolute path to the video file.
         """
-        self._append_row(video_path, 1, "")
+        self._append_row(video_path, 1, "", "")
 
     def write_fail(self, video_path: str, clip_path: str):
         """
@@ -94,36 +95,38 @@ class CSVManager:
             video_path: Absolute path to the source video.
             clip_path: Absolute path to the extracted failure clip.
         """
-        self._append_row(video_path, 0, clip_path)
+        self._append_row(video_path, 0, clip_path, "")
 
-    def write_uncertain(self, video_path: str):
+    def write_uncertain(self, video_path: str, note: str = ""):
         """
         Write an UNCERTAIN label for a video.
 
         Args:
             video_path: Absolute path to the video file.
+            note: Optional note explaining the uncertainty.
         """
-        self._append_row(video_path, 2, "")
+        self._append_row(video_path, 2, "", note)
 
-    def _append_row(self, video_path: str, label: int, output_path: str):
+    def _append_row(self, video_path: str, label: int, output_path: str, note: str = ""):
         """
         Append a row to the CSV file.
 
         Args:
             video_path: Path to the video file.
-            label: 1 for pass, 0 for fail.
-            output_path: Path to the failure clip (empty for pass).
+            label: 1 for pass, 0 for fail, 2 for uncertain.
+            output_path: Path to the failure clip (empty for pass/uncertain).
+            note: Optional note (used for uncertain labels).
         """
         with open(self.csv_path, 'a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
-            writer.writerow([video_path, label, output_path])
+            writer.writerow([video_path, label, output_path, note])
 
-    def remove_last_entry(self) -> Optional[Tuple[str, int, Optional[str]]]:
+    def remove_last_entry(self) -> Optional[Tuple[str, int, Optional[str], Optional[str]]]:
         """
         Remove the last entry from the CSV file.
 
         Returns:
-            The removed entry (video_path, label, output_path) or None if empty.
+            The removed entry (video_path, label, output_path, note) or None if empty.
         """
         entries = self.get_all_entries()
 
@@ -135,8 +138,8 @@ class CSVManager:
         # Rewrite the CSV without the last entry
         with open(self.csv_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
-            for video_path, label, output_path in entries:
-                writer.writerow([video_path, label, output_path or ""])
+            for video_path, label, output_path, note in entries:
+                writer.writerow([video_path, label, output_path or "", note or ""])
 
         return removed
 
@@ -148,9 +151,9 @@ class CSVManager:
             Dictionary with 'total', 'passed', 'failed', and 'uncertain' counts.
         """
         entries = self.get_all_entries()
-        passed = sum(1 for _, label, _ in entries if label == 1)
-        failed = sum(1 for _, label, _ in entries if label == 0)
-        uncertain = sum(1 for _, label, _ in entries if label == 2)
+        passed = sum(1 for _, label, _, _ in entries if label == 1)
+        failed = sum(1 for _, label, _, _ in entries if label == 0)
+        uncertain = sum(1 for _, label, _, _ in entries if label == 2)
 
         return {
             'total': len(entries),

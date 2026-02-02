@@ -7,7 +7,7 @@ from typing import Optional, List
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QFileDialog, QMessageBox,
-    QFrame, QProgressDialog, QSizePolicy
+    QFrame, QProgressDialog, QSizePolicy, QInputDialog
 )
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QKeyEvent, QFont
@@ -574,12 +574,23 @@ class VideoLabelingApp(QMainWindow):
         self._next_video()
 
     def _mark_uncertain(self):
-        """Mark current video as UNCERTAIN."""
+        """Mark current video as UNCERTAIN with optional note."""
         if self._segment_mode or not self._current_video:
             return
 
-        self._csv_manager.write_uncertain(self._current_video)
-        self._next_video()
+        self._player.pause()
+
+        note, ok = QInputDialog.getText(
+            self,
+            "Uncertain - Add Note",
+            "Enter a note (optional):",
+        )
+
+        if ok:  # User clicked OK (note can be empty)
+            self._csv_manager.write_uncertain(self._current_video, note)
+            self._next_video()
+        else:  # User cancelled
+            self._player.play()
 
     def _mark_fail(self):
         """Enter segment mode to mark failure."""
