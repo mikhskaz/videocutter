@@ -196,6 +196,8 @@ class VideoPlayer(QWidget):
             self.set_playback_rate(0.5)
         elif self._playback_rate == 0.5:
             self.set_playback_rate(0.25)
+        elif self._playback_rate == 0.25:
+            self.set_playback_rate(0.1)
         else:
             self.set_playback_rate(1.0)
         return self._playback_rate
