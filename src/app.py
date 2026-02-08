@@ -7,10 +7,57 @@ from typing import Optional, List
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QFileDialog, QMessageBox,
-    QFrame, QProgressDialog, QSizePolicy, QInputDialog
+    QFrame, QProgressDialog, QSizePolicy, QInputDialog, QDialog
 )
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QKeyEvent, QFont
+
+
+class QuickYesNoDialog(QDialog):
+    """Dialog that responds to Y/N key presses for quick selection."""
+
+    def __init__(self, title: str, message: str, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.result_yes = False
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
+
+        label = QLabel(message)
+        label.setWordWrap(True)
+        layout.addWidget(label)
+
+        hint = QLabel("Press Y for Yes, N for No")
+        hint.setStyleSheet("color: #888888; font-style: italic;")
+        hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(hint)
+
+        btn_layout = QHBoxLayout()
+        yes_btn = QPushButton("Yes (Y)")
+        yes_btn.clicked.connect(self._on_yes)
+        no_btn = QPushButton("No (N)")
+        no_btn.clicked.connect(self._on_no)
+        btn_layout.addWidget(yes_btn)
+        btn_layout.addWidget(no_btn)
+        layout.addLayout(btn_layout)
+
+    def keyPressEvent(self, event: QKeyEvent):
+        if event.key() == Qt.Key.Key_Y:
+            self._on_yes()
+        elif event.key() == Qt.Key.Key_N:
+            self._on_no()
+        else:
+            super().keyPressEvent(event)
+
+    def _on_yes(self):
+        self.result_yes = True
+        self.accept()
+
+    def _on_no(self):
+        self.result_yes = False
+        self.accept()
 
 from .video_player import VideoPlayer
 from .timeline import TimelineWidget
@@ -37,6 +84,7 @@ class VideoLabelingApp(QMainWindow):
         self._segment_mode = False
         self._segment_start: Optional[int] = None
         self._segment_end: Optional[int] = None
+        self._collected_clips: List[str] = []
 
         self._setup_ui()
         self._setup_shortcuts()
@@ -616,6 +664,7 @@ class VideoLabelingApp(QMainWindow):
         self._segment_mode = True
         self._segment_start = None
         self._segment_end = None
+        self._collected_clips = []
 
         self._player.pause()
         self._timeline.set_segment_mode(True)
@@ -670,7 +719,8 @@ class VideoLabelingApp(QMainWindow):
         """Update segment info display."""
         start_str = self._format_time(self._segment_start) if self._segment_start is not None else "--:--"
         end_str = self._format_time(self._segment_end) if self._segment_end is not None else "--:--"
-        self._segment_info.setText(f"Segment: {start_str} to {end_str}")
+        clips_count = f" | Clips: {len(self._collected_clips)}" if self._collected_clips else ""
+        self._segment_info.setText(f"Segment: {start_str} to {end_str}{clips_count}")
 
     def _confirm_segment(self):
         """Confirm segment and extract clip."""
@@ -712,9 +762,28 @@ class VideoLabelingApp(QMainWindow):
         progress.close()
 
         if success and clip_path:
-            self._csv_manager.write_fail(self._current_video, clip_path)
-            self._exit_segment_mode()
-            self._next_video()
+            self._collected_clips.append(clip_path)
+
+            # Ask if user wants to add another segment
+            dialog = QuickYesNoDialog(
+                "Add Another Segment?",
+                f"Clip {len(self._collected_clips)} extracted.\n\nDo you want to mark another failure segment?",
+                self
+            )
+            dialog.exec()
+
+            if dialog.result_yes:
+                # Reset segment markers for next selection
+                self._segment_start = None
+                self._segment_end = None
+                self._timeline.clear_segment()
+                self._update_segment_info()
+            else:
+                # Write all collected clips and move to next video
+                self._csv_manager.write_fail(self._current_video, self._collected_clips)
+                self._collected_clips = []
+                self._exit_segment_mode()
+                self._next_video()
         else:
             QMessageBox.critical(
                 self,
@@ -724,6 +793,29 @@ class VideoLabelingApp(QMainWindow):
 
     def _cancel_segment(self):
         """Cancel segment selection and return to normal mode."""
+        if self._collected_clips:
+            # Some clips were already collected, ask what to do
+            reply = QMessageBox.question(
+                self,
+                "Save Collected Clips?",
+                f"You have {len(self._collected_clips)} clip(s) already marked.\n\n"
+                "Do you want to save them before exiting?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
+            )
+
+            if reply == QMessageBox.StandardButton.Yes:
+                # Save collected clips and move to next video
+                self._csv_manager.write_fail(self._current_video, self._collected_clips)
+                self._collected_clips = []
+                self._exit_segment_mode()
+                self._next_video()
+                return
+            elif reply == QMessageBox.StandardButton.Cancel:
+                # Stay in segment mode
+                return
+            # No - discard clips and exit
+
+        self._collected_clips = []
         self._exit_segment_mode()
         self._player.play()
 

@@ -87,15 +87,16 @@ class CSVManager:
         """
         self._append_row(video_path, 1, "", "")
 
-    def write_fail(self, video_path: str, clip_path: str):
+    def write_fail(self, video_path: str, clip_paths: list):
         """
-        Write a FAIL label for a video with the clip path.
+        Write a FAIL label for a video with the clip path(s).
 
         Args:
             video_path: Absolute path to the source video.
-            clip_path: Absolute path to the extracted failure clip.
+            clip_paths: List of absolute paths to the extracted failure clips.
         """
-        self._append_row(video_path, 0, clip_path, "")
+        clips_str = "|".join(clip_paths)
+        self._append_row(video_path, 0, clips_str, "")
 
     def write_uncertain(self, video_path: str, note: str = ""):
         """
