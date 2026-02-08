@@ -317,6 +317,8 @@ class VideoLabelingApp(QMainWindow):
                 self._toggle_play_pause()
             elif key == Qt.Key.Key_M:
                 self._toggle_slow_motion()
+            elif key == Qt.Key.Key_R:
+                self._replay()
         else:
             # Normal mode shortcuts
             if key == Qt.Key.Key_P:
